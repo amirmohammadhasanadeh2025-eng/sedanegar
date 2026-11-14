@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -24,8 +27,18 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk sedanegar.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: sedanegar-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: sedanegar.apk
+
+      # APK را به‌صورت Release منتشر می‌کند تا از صفحه‌ی Releases مستقیم دانلود شود
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" sedanegar.apk \
+            --title "صدانگار - ساخت ${{ github.run_number }}" \
+            --notes "فایل نصبی اندروید. روی گوشی دانلود و نصب کنید."
