@@ -94,8 +94,8 @@ button{cursor:pointer;border:0;background:none;padding:0;touch-action:manipulati
 .empty b{display:block;color:var(--ink);font-size:19px;margin-bottom:4px}
 
 /* tabs */
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--ground)}
-.tab{min-height:54px;border-radius:16px;font-weight:700;color:var(--ink-2);position:relative}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--ground)}
+.tab{min-height:54px;border-radius:16px;font-weight:700;font-size:15px;line-height:1.35;padding:0 4px;color:var(--ink-2);position:relative}
 .tab[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:inset 0 -3px 0 var(--saffron)}
 .dot{position:absolute;top:12px;inset-inline-end:26%;width:10px;height:10px;border-radius:50%;background:var(--rec)}
 
@@ -143,6 +143,21 @@ button{cursor:pointer;border:0;background:none;padding:0;touch-action:manipulati
 .bar i{display:block;height:100%;width:0;background:var(--teal);border-radius:6px;transition:width .2s linear}
 .result{margin:12px 2px 0;font-size:15.5px;color:var(--ink-2);text-align:center}
 
+/* کم‌حجم‌کن */
+.tools{display:grid;gap:12px}
+.tool{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;width:100%;text-align:start;padding:18px 16px;border-radius:24px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.tool:disabled{opacity:.55}
+.tool .ti{width:60px;height:60px;border-radius:20px;background:var(--teal);color:var(--on-teal);display:grid;place-items:center}
+.tool .ti svg{width:30px;height:30px}
+.tool .tt{font-weight:800;font-size:19px}
+.tool .td{font-size:14.5px;color:var(--ink-2);line-height:1.6}
+.pct{font-size:44px;font-weight:700;text-align:center;direction:ltr;font-variant-numeric:tabular-nums;margin:10px 0 0}
+.est{margin:12px 2px 0;font-size:15.5px;text-align:center;color:var(--ink-2)}
+.est b{color:var(--ink)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 4px}
+.fact{background:var(--ground);border-radius:16px;padding:12px;text-align:center}
+.fact .lbl{font-size:14px;color:var(--ink-2)}
+.fact .val{font-size:20px;font-weight:700}
 #toast{position:fixed;inset-inline:16px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:80;display:flex;justify-content:center;pointer-events:none}
 #toast span{background:var(--ink);color:var(--ground);padding:12px 18px;border-radius:14px;font-size:16px;box-shadow:var(--shadow);animation:fade .2s}
 
@@ -194,11 +209,21 @@ button{cursor:pointer;border:0;background:none;padding:0;touch-action:manipulati
       <ul class="list" id="list"></ul>
       <div class="empty" id="empty" hidden><b>هنوز ضبطی ندارید</b>اولین ضبط را از تب «ضبط» بسازید.</div>
     </section>
+
+    <section id="viewTools" class="view" hidden>
+      <p class="qual-hint" style="margin:6px 2px 14px">فایلی را از گوشی انتخاب کنید تا حجمش کم شود. فایل اصلی دست‌نخورده می‌ماند و نسخه‌ی کوچک‌تر در پوشه‌ی Sedanegar ذخیره می‌شود.</p>
+      <div class="tools">
+        <button class="tool" id="toolAudio"></button>
+        <button class="tool" id="toolVideo"></button>
+      </div>
+      <div class="banner" id="toolBanner" hidden>این بخش فقط در برنامه‌ی اندروید کار می‌کند.</div>
+    </section>
   </main>
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tabRec" aria-selected="true">ضبط<i class="dot" id="tabDot" hidden></i></button>
     <button class="tab" role="tab" id="tabLib" aria-selected="false">ضبط‌شده‌ها <span id="count"></span></button>
+    <button class="tab" role="tab" id="tabTools" aria-selected="false">کم‌حجم‌کن</button>
   </nav>
 </div>
 <div id="sheetRoot"></div>
@@ -263,6 +288,8 @@ const ICONS={
   share:`<svg ${ST}><path d="M12 15V3M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h14"/></svg>`,
   save:`<svg ${ST}><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>`,
   trash:`<svg ${ST}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>`,
+  audio:`<svg ${ST}><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg>`,
+  video:`<svg ${ST}><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10.5 5-3v9l-5-3z"/></svg>`,
   pen:`<svg ${ST}><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>`
 };
 function ico(n){return h('span',{html:ICONS[n],style:'display:contents'})}
@@ -525,7 +552,8 @@ function openSave(p){
     try{await idb.put('recs',rec)}
     catch(e){saving=false;saveBtn.disabled=false;info('ذخیره نشد','حافظه‌ی مرورگر پر است یا اجازه‌ی ذخیره‌سازی ندارد. چند ضبط قدیمی را حذف کنید و دوباره امتحان کنید.');return}
     await clearDraft(p.sid);
-    s.close();await refreshLib();setTab('lib');toast('ذخیره شد');
+    const copied=await autoExport(rec);
+    s.close();await refreshLib();setTab('lib');toast(copied?'ذخیره شد · نسخه‌ای هم در پوشه‌ی Sedanegar است':'ذخیره شد');
   }
   input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save()}});
   const s=sheet(h('div',null,
@@ -586,10 +614,11 @@ function renderLib(){
 }
 function setTab(t){
   S.tab=t;
-  $('#viewRec').hidden=t!=='rec';$('#viewLib').hidden=t!=='lib';
+  $('#viewRec').hidden=t!=='rec';$('#viewLib').hidden=t!=='lib';$('#viewTools').hidden=t!=='tools';
   $('#tabRec').setAttribute('aria-selected',String(t==='rec'));
   $('#tabLib').setAttribute('aria-selected',String(t==='lib'));
-  if(t==='lib')renderLib();else drawLive();
+  $('#tabTools').setAttribute('aria-selected',String(t==='tools'));
+  if(t==='lib')renderLib();else if(t==='rec')drawLive();
 }
 
 /* ---------- audio helpers ---------- */
@@ -628,12 +657,10 @@ async function sendNative(rec,mode){
   for(let o=0;o<f.size;o+=CH)B.chunk(await b64Of(f.slice(o,o+CH)));
   return B.finish(mode);
 }
-async function saveRec(rec){
-  if(window.NativeBridge){
-    try{const ok=await sendNative(rec,'save');toast(ok?'در پوشه‌ی Download/Sedanegar ذخیره شد':'ذخیره نشد')}catch(e){toast('ذخیره نشد')}
-    return;
-  }
-  download(fileOf(rec));toast('فایل روی گوشی ذخیره شد');
+/* هر ضبط خودکار در پوشه‌ی Sedanegar (بخش موسیقی گوشی) هم کپی می‌شود */
+async function autoExport(rec){
+  if(!window.NativeBridge)return false;
+  try{return await sendNative(rec,'save')}catch(e){return false}
 }
 async function shareRec(rec){
   if(window.NativeBridge){
@@ -693,10 +720,9 @@ function openPlayer(rec){
     h('div',{class:'two',style:'margin-top:10px'},
       h('button',{class:'btn',onclick:()=>{closeAll();openTrim(rec)}},ico('cut'),'برش'),
       h('button',{class:'btn',onclick:()=>{closeAll();openRename(rec,()=>openPlayer(rec))}},ico('pen'),'تغییر نام')),
-    h('div',{class:'two',style:'margin-top:10px'},
+    h('div',{class:'stack',style:'margin-top:10px'},
       h('button',{class:'btn',onclick:()=>shareRec(rec)},ico('share'),'ارسال'),
-      h('button',{class:'btn',onclick:()=>saveRec(rec)},ico('save'),'ذخیره در گوشی')),
-    h('div',{class:'stack'},h('button',{class:'btn danger',onclick:()=>{closeAll();openDelete(rec)}},ico('trash'),'حذف'))
+      h('button',{class:'btn danger',onclick:()=>{closeAll();openDelete(rec)}},ico('trash'),'حذف'))
   ),{onClose:()=>{cancelAnimationFrame(raf);try{a.pause()}catch(e){}try{URL.revokeObjectURL(url)}catch(e){}}});
   requestAnimationFrame(paint);
 }
@@ -856,6 +882,7 @@ function openTrim(rec){
       name:replace?rec.name:rec.name+' (برش‌خورده)',created:replace?rec.created:Date.now(),
       duration:out.duration,size:out.blob.size,mime:out.mime,bps:rec.bps,peaks:slicePeaks(rec.peaks||[],sg),blob:out.blob};
     try{await idb.put('recs',nr)}catch(e){sheetT.close();info('ذخیره نشد','حافظه‌ی مرورگر پر است.');return}
+    if(!replace)await autoExport(nr);
     sheetT.close();await refreshLib();setTab('lib');toast(replace?'ضبط اصلی جایگزین شد':'ضبط جدید ذخیره شد');
   }
   newBtn.onclick=()=>exportIt(false);
@@ -879,6 +906,109 @@ function openTrim(rec){
   requestAnimationFrame(update);
 }
 
+
+/* ---------- کم‌حجم‌کن صدا و ویدیو (انجام کار با کدک خود اندروید) ---------- */
+const AQ=[
+  {id:'small',label:'کم‌حجم',bps:24000,hint:'برای صدای گفتار؛ بیشترین کاهش حجم'},
+  {id:'balanced',label:'متعادل',bps:48000,hint:'گفتار شفاف و کمی صدای محیط'},
+  {id:'high',label:'باکیفیت',bps:96000,hint:'نزدیک‌تر به کیفیت اصلی'}
+];
+const VQ=[
+  {id:'small',label:'کم‌حجم',side:480,vbps:900000,abps:64000,hint:'کیفیت ۴۸۰؛ برای ارسال در پیام‌رسان'},
+  {id:'balanced',label:'متعادل',side:720,vbps:1800000,abps:96000,hint:'کیفیت ۷۲۰؛ تعادل خوب حجم و وضوح'},
+  {id:'high',label:'باکیفیت',side:1080,vbps:3500000,abps:128000,hint:'کیفیت ۱۰۸۰؛ وضوح بالاتر'}
+];
+const T={job:null};
+window.__native={onEvent(e){if(T.job&&T.job.on)T.job.on(e)}};
+
+function toolPlan(info,q){
+  const isV=info.kind==='video',dur=Math.max(1,info.duration);
+  if(!isV)return {abps:q.bps,vbps:0,side:0,est:q.bps*dur/8};
+  const cap=info.bitrate>0?info.bitrate*0.85:Infinity;
+  const vb=Math.round(Math.min(q.vbps,cap));
+  return {abps:q.abps,vbps:vb,side:q.side,est:(vb+q.abps)*dur/8};
+}
+function pickMedia(kind){
+  if(!window.NativeBridge){$('#toolBanner').hidden=false;return}
+  try{NativeBridge.pickMedia(kind)}catch(e){toast('انتخاب فایل ممکن نشد')}
+}
+function openCompress(info){
+  const isV=info.kind==='video',Q=isV?VQ:AQ;
+  let qi=Math.max(0,Q.findIndex(x=>x.id===store.get('cq','small')));
+  const body=h('div');
+  const s=sheet(body,{dismiss:false,onClose:()=>{T.job=null}});
+  function paintChoose(){
+    const q=Q[qi],plan=toolPlan(info,q),pct=Math.round((1-plan.est/info.size)*100);
+    const useful=pct>=5;
+    const chips=h('div',{class:'qual',role:'radiogroup','aria-label':'کیفیت خروجی',style:'margin-top:12px'},
+      ...Q.map((x,i)=>h('button',{class:'chip'+(i===qi?' on':''),role:'radio','aria-checked':String(i===qi),onclick:()=>{qi=i;store.set('cq',x.id);paintChoose()}},x.label)));
+    const dims=isV&&info.width?[' · ',h('span',{class:'num'},fa(info.width)+'×'+fa(info.height))]:[];
+    body.replaceChildren(
+      h('h2',null,isV?'کم‌حجم کردن ویدیو':'کم‌حجم کردن صدا'),
+      h('p',{class:'sub',style:'word-break:break-word'},info.name),
+      h('div',{class:'facts'},
+        h('div',{class:'fact'},h('div',{class:'lbl'},'حجم فعلی'),h('div',{class:'val'},fmtSize(info.size))),
+        h('div',{class:'fact'},h('div',{class:'lbl'},'مدت'),h('div',{class:'val num'},fmtClock(info.duration)))),
+      dims.length?h('p',{class:'sub',style:'text-align:center;margin:0'},'ابعاد',...dims):null,
+      chips,
+      h('p',{class:'qual-hint'},q.hint),
+      h('p',{class:'est'},useful?['حجم تقریبی بعد از کم‌حجم کردن: ',h('b',null,fmtSize(plan.est)),` (حدود ${fa(pct)}٪ کمتر)`]:'این کیفیت تقریباً حجم این فایل را کم نمی‌کند. کیفیت پایین‌تری انتخاب کنید.'),
+      h('div',{class:'stack'},
+        h('button',{class:'btn primary',disabled:!useful,onclick:()=>start(plan)},'شروع کم‌حجم کردن'),
+        h('button',{class:'btn',onclick:()=>s.close()},'انصراف')));
+  }
+  function start(plan){
+    const bar=h('i'),pct=h('div',{class:'pct'},fa(0)+'٪');
+    let finished=false;
+    body.replaceChildren(
+      h('h2',null,'در حال کم‌حجم کردن'),
+      h('p',{class:'sub'},isV?'ویدیو معمولاً از مدتش طولانی‌تر یا هم‌اندازه‌ی آن زمان می‌برد. برنامه را باز نگه دارید؛ می‌توانید صفحه را خاموش هم کنید.':'برنامه را باز نگه دارید؛ می‌توانید صفحه را خاموش هم کنید.'),
+      pct,h('div',{class:'bar'},bar),
+      h('div',{class:'stack'},h('button',{class:'btn',onclick:()=>{try{NativeBridge.cancelJob()}catch(e){}finished=true;s.close();toast('لغو شد')}},'لغو')));
+    T.job={on(e){
+      if(finished)return;
+      if(e.type==='progress'){const v=clamp(Math.round(e.p),0,100);bar.style.width=v+'%';pct.textContent=fa(v)+'٪'}
+      else if(e.type==='error'){finished=true;paintFail()}
+      else if(e.type==='done'){finished=true;paintDone(e)}
+    }};
+    try{NativeBridge.compress(info.kind,plan.vbps,plan.abps,plan.side)}catch(err){finished=true;paintFail()}
+  }
+  function paintFail(){
+    body.replaceChildren(h('h2',null,'کم‌حجم کردن انجام نشد'),
+      h('p',{class:'sub'},'ممکن است فایل خراب باشد یا قالبش پشتیبانی نشود، یا حافظه‌ی گوشی پر باشد. یک فایل دیگر را امتحان کنید.'),
+      h('div',{class:'stack'},h('button',{class:'btn primary',onclick:()=>s.close()},'باشه')));
+  }
+  function paintDone(e){
+    const smaller=e.out<e.in,pct=Math.round((1-e.out/e.in)*100);
+    body.replaceChildren(
+      h('h2',null,smaller?'تمام شد':'حجم کمتر نشد'),
+      h('div',{class:'facts'},
+        h('div',{class:'fact'},h('div',{class:'lbl'},'قبل'),h('div',{class:'val'},fmtSize(e.in))),
+        h('div',{class:'fact'},h('div',{class:'lbl'},'بعد'),h('div',{class:'val'},fmtSize(e.out)))),
+      h('p',{class:'est'},smaller?[`حجم ${fa(pct)}٪ کمتر شد. `,e.saved?'نسخه‌ی کوچک در پوشه‌ی Sedanegar ذخیره شد.':'']:'این فایل از قبل فشرده بود. همان فایل اصلی را نگه دارید.'),
+      h('div',{class:'stack'},
+        smaller?h('button',{class:'btn primary',onclick:()=>{try{NativeBridge.shareResult()}catch(err){toast('ارسال نشد')}}},ico('share'),'ارسال'):null,
+        h('button',{class:'btn',onclick:()=>s.close()},'بستن')));
+  }
+  /* انتخاب فایل جدید توسط کاربر هنگام باز بودن این صفحه */
+  paintChoose();
+}
+window.__native.onPicked=info=>{
+  if(!info||!info.ok){toast('فایل انتخاب‌شده خوانده نشد');return}
+  openCompress(info);
+};
+const _onEvent=window.__native.onEvent;
+window.__native.onEvent=e=>{if(e.type==='picked')window.__native.onPicked(e);else _onEvent(e)};
+function buildTools(){
+  const mk=(id,icon,title,desc,kind)=>{
+    const b=$(id);b.replaceChildren(h('span',{class:'ti'},ico(icon)),h('span',null,h('div',{class:'tt'},title),h('div',{class:'td'},desc)));
+    b.onclick=()=>pickMedia(kind);b.disabled=!window.NativeBridge;
+  };
+  mk('#toolAudio','audio','کم‌حجم کردن صدا','ضبط‌های قدیمی گوشی یا هر فایل صوتی را انتخاب کنید','audio');
+  mk('#toolVideo','video','کم‌حجم کردن ویدیو','یک ویدیو از گوشی انتخاب کنید و حجمش را کم کنید','video');
+  $('#toolBanner').hidden=!!window.NativeBridge;
+}
+
 /* ---------- wiring ---------- */
 $('#btnMain').onclick=()=>{if(!R)startRec();else if(R.state==='rec')pauseRec();else resumeRec()};
 $('#btnStop').replaceChildren(ico('stop'));$('#btnStop').onclick=stopRec;
@@ -890,12 +1020,14 @@ $('#btnCancel').onclick=()=>{
 };
 $('#tabRec').onclick=()=>setTab('rec');
 $('#tabLib').onclick=()=>setTab('lib');
+$('#tabTools').onclick=()=>setTab('tools');
 $('#search').addEventListener('input',renderLib);
-window.addEventListener('resize',()=>{if(S.tab==='rec')drawLive();else renderLib()});
+window.addEventListener('resize',()=>{if(S.tab==='rec')drawLive();else if(S.tab==='lib')renderLib()});
 const mq=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)');
-if(mq&&mq.addEventListener)mq.addEventListener('change',()=>{readColors();S.tab==='rec'?drawLive():renderLib()});
+if(mq&&mq.addEventListener)mq.addEventListener('change',()=>{readColors();if(S.tab==='rec')drawLive();else if(S.tab==='lib')renderLib()});
 
 readColors();
+buildTools();
 renderRecUI();
 setTab('rec');
 refreshLib().then(checkDrafts);

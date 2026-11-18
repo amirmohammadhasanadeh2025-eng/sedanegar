@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private String outName = "recording.webm";
     private String outMime = "audio/webm";
     private OutputStream out;
+    private MediaTool tool;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,6 +86,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        tool = new MediaTool(this, web);
         web.addJavascriptInterface(new Bridge(), "NativeBridge");
         web.loadUrl("https://" + HOST + "/assets/index.html");
 
@@ -125,6 +127,14 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == MediaTool.REQ_PICK && res == RESULT_OK && data != null && tool != null) {
+            tool.onPicked(data);
+        }
+    }
+
+    @Override
     public void onBackPressed() {
         // با دکمه‌ی برگشت برنامه بسته نمی‌شود تا ضبط جاری قطع نشود
         moveTaskToBack(true);
@@ -134,6 +144,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         try { stopService(new Intent(this, RecordService.class)); } catch (Exception ignored) { }
         closeOut();
+        if (tool != null) tool.destroy();
         if (web != null) {
             web.removeJavascriptInterface("NativeBridge");
             web.destroy();
@@ -163,6 +174,26 @@ public class MainActivity extends Activity {
                 if (on) startForegroundService(i);
                 else stopService(i);
             } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public void pickMedia(String kind) {
+            tool.pick(kind);
+        }
+
+        @JavascriptInterface
+        public void compress(String kind, int videoBps, int audioBps, int shortSide) {
+            tool.compress(kind, videoBps, audioBps, shortSide);
+        }
+
+        @JavascriptInterface
+        public void cancelJob() {
+            tool.cancel();
+        }
+
+        @JavascriptInterface
+        public void shareResult() {
+            tool.shareResult();
         }
 
         @JavascriptInterface
@@ -202,7 +233,7 @@ public class MainActivity extends Activity {
             } catch (IOException e) {
                 return false;
             }
-            return "share".equals(mode) ? shareFile() : saveToDownloads();
+            return "share".equals(mode) ? shareFile() : saveToFolder();
         }
     }
 
@@ -221,15 +252,15 @@ public class MainActivity extends Activity {
         }
     }
 
-    private boolean saveToDownloads() {
+    private boolean saveToFolder() {
         try {
             ContentValues v = new ContentValues();
             v.put(MediaStore.MediaColumns.DISPLAY_NAME, outName);
             v.put(MediaStore.MediaColumns.MIME_TYPE, outMime);
-            v.put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/Sedanegar");
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH, "Music/Sedanegar");
             v.put(MediaStore.MediaColumns.IS_PENDING, 1);
             ContentResolver cr = getContentResolver();
-            Uri item = cr.insert(MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), v);
+            Uri item = cr.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), v);
             if (item == null) return false;
             try (OutputStream os = cr.openOutputStream(item); InputStream in = new FileInputStream(outFile)) {
                 byte[] buf = new byte[65536];
