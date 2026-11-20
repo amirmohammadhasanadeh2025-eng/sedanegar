@@ -51,6 +51,7 @@ class MediaTool {
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     private String kind = "audio";
+    private boolean extract;
     private Uri inUri;
     private String inName = "";
     private long inSize;
@@ -78,7 +79,8 @@ class MediaTool {
 
     // ---------- pick ----------
     void pick(final String k) {
-        kind = "video".equals(k) ? "video" : "audio";
+        extract = "extract".equals(k);
+        kind = (extract || "video".equals(k)) ? "video" : "audio";
         ui.post(() -> {
             try {
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -134,13 +136,48 @@ class MediaTool {
                 } catch (Exception ignored) { }
             }
             boolean ok = inSize > 0 && durMs > 0;
-            o.put("type", "picked").put("ok", ok).put("kind", kind).put("name", inName)
+            o.put("type", "picked").put("ok", ok).put("kind", extract ? "extract" : kind).put("name", inName)
                     .put("size", inSize).put("duration", durMs / 1000.0)
                     .put("bitrate", bitrate).put("width", vw).put("height", vh);
             emit(o);
         } catch (Exception e) {
             emit("pickfail");
         }
+    }
+
+    private boolean videoOut() {
+        return "video".equals(kind) && !extract;
+    }
+
+    /** تبدیل یک فایل صوتی (مثلاً webm) به m4a/AAC؛ روی نخ اصلی اجرا می‌شود. */
+    void transcodeAudio(final File in, final File out, final int bps, final Runnable ok, final Runnable fail) {
+        ui.post(() -> {
+            try {
+                DefaultEncoderFactory ef = new DefaultEncoderFactory.Builder(act)
+                        .setRequestedAudioEncoderSettings(new AudioEncoderSettings.Builder().setBitrate(bps).build())
+                        .build();
+                Transformer t = new Transformer.Builder(act)
+                        .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                        .setEncoderFactory(ef)
+                        .addListener(new Transformer.Listener() {
+                            @Override
+                            public void onCompleted(Composition composition, ExportResult result) {
+                                ok.run();
+                            }
+
+                            @Override
+                            public void onError(Composition composition, ExportResult result, ExportException e) {
+                                fail.run();
+                            }
+                        })
+                        .build();
+                EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(in)))
+                        .setRemoveVideo(true).build();
+                t.start(item, out.getAbsolutePath());
+            } catch (Exception e) {
+                fail.run();
+            }
+        });
     }
 
     private static long parseLong(String s) {
@@ -152,7 +189,7 @@ class MediaTool {
         ui.post(() -> {
             if (running || inUri == null) return;
             try {
-                final boolean video = "video".equals(kind);
+                final boolean video = videoOut();
                 File dir = new File(act.getCacheDir(), "share");
                 dir.mkdirs();
                 File[] old = dir.listFiles();
@@ -163,7 +200,7 @@ class MediaTool {
                 if (dot > 0) base = base.substring(0, dot);
                 base = base.replaceAll("[\\\\/:*?\"<>|]+", "-").trim();
                 if (base.isEmpty()) base = "file";
-                outName = base + " (کم‌حجم)" + (video ? ".mp4" : ".m4a");
+                outName = base + (extract ? " (صدا)" : " (کم‌حجم)") + (video ? ".mp4" : ".m4a");
                 outFile = new File(dir, outName);
 
                 DefaultEncoderFactory.Builder eb = new DefaultEncoderFactory.Builder(act)
@@ -251,10 +288,10 @@ class MediaTool {
         running = false;
         setBusy(false);
         final long outSize = outFile == null ? 0 : outFile.length();
-        final boolean video = "video".equals(kind);
+        final boolean video = videoOut();
         new Thread(() -> {
             boolean saved = false;
-            if (outSize > 0 && outSize < inSize) saved = saveToFolder(video);
+            if (outSize > 0 && (extract || outSize < inSize)) saved = saveToFolder(video);
             try {
                 emit(new JSONObject().put("type", "done").put("in", inSize)
                         .put("out", outSize).put("saved", saved));
@@ -297,7 +334,7 @@ class MediaTool {
                 if (outFile == null || !outFile.exists()) return;
                 Uri uri = FileProvider.getUriForFile(act, act.getPackageName() + ".files", outFile);
                 Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType("video".equals(kind) ? "video/mp4" : "audio/mp4");
+                send.setType(videoOut() ? "video/mp4" : "audio/mp4");
                 send.putExtra(Intent.EXTRA_STREAM, uri);
                 send.setClipData(ClipData.newRawUri("", uri));
                 send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

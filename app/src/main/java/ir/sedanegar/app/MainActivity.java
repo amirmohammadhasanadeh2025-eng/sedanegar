@@ -46,10 +46,12 @@ public class MainActivity extends Activity {
     private String outMime = "audio/webm";
     private OutputStream out;
     private MediaTool tool;
+    private static MainActivity current;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        current = this;
 
         web = new WebView(this);
         web.setBackgroundColor(getResources().getColor(R.color.bg, getTheme()));
@@ -144,12 +146,38 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         try { stopService(new Intent(this, RecordService.class)); } catch (Exception ignored) { }
         closeOut();
+        if (current == this) current = null;
         if (tool != null) tool.destroy();
         if (web != null) {
             web.removeJavascriptInterface("NativeBridge");
             web.destroy();
         }
         super.onDestroy();
+    }
+
+    /** فرمان‌های اعلان صفحه‌ی قفل (مکث، ادامه، پایان) را به صفحه‌ی وب می‌رساند. */
+    static void dispatchCmd(final String cmd) {
+        final MainActivity a = current;
+        if (a == null || a.web == null) return;
+        a.runOnUiThread(() -> a.web.evaluateJavascript(
+                "window.__native&&window.__native.onEvent({type:'cmd',cmd:'" + cmd + "'})", null));
+    }
+
+    private void exportAsync(final String mode, File f, String mime) {
+        outFile = f;
+        outName = f.getName();
+        outMime = mime;
+        new Thread(() -> {
+            boolean ok;
+            try {
+                ok = "share".equals(mode) ? shareFile() : saveToFolder();
+            } catch (Exception e) {
+                ok = false;
+            }
+            final boolean fok = ok;
+            runOnUiThread(() -> web.evaluateJavascript(
+                    "window.__native&&window.__native.onEvent({type:'export',ok:" + fok + "})", null));
+        }).start();
     }
 
     private void closeOut() {
@@ -225,7 +253,12 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public boolean finish(String mode) {
+        public void recState(String state, long elapsedMs) {
+            RecordService.update(state, elapsedMs);
+        }
+
+        @JavascriptInterface
+        public boolean finish(final String mode, final int bps) {
             try {
                 if (out == null) return false;
                 out.close();
@@ -233,7 +266,20 @@ public class MainActivity extends Activity {
             } catch (IOException e) {
                 return false;
             }
-            return "share".equals(mode) ? shareFile() : saveToFolder();
+            final File src = outFile;
+            final String srcMime = outMime;
+            if (src.getName().toLowerCase().endsWith(".m4a") || srcMime.contains("mp4")) {
+                exportAsync(mode, src, srcMime);
+                return true;
+            }
+            String n = src.getName();
+            int dot = n.lastIndexOf('.');
+            final File dst = new File(src.getParentFile(), (dot > 0 ? n.substring(0, dot) : n) + ".m4a");
+            // صدای webm به m4a تبدیل می‌شود؛ اگر نشد، همان فایل اصلی استفاده می‌شود
+            tool.transcodeAudio(src, dst, bps,
+                    () -> exportAsync(mode, dst, "audio/mp4"),
+                    () -> exportAsync(mode, src, srcMime));
+            return true;
         }
     }
 
